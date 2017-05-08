@@ -1,0 +1,48 @@
+var passport = require('passport');
+var LocalStrategy = require('passport-local').Strategy;
+var FacebookStrategy = require('passport-facebook').Strategy;
+
+var User = require('./models/user');
+var config = require('./config');
+
+// passport configuration
+// naci gde se ovde eksportovana "local" strategija dalje upotrebljava u aplikaciji
+exports.local = passport.use(new LocalStrategy(User.authenticate()));
+// <--- strategije su mehanizmi autentifikacije ("potvrde", "overe") <---
+passport.serializeUser(User.serializeUser());
+passport.deserializeUser(User.deserializeUser());
+
+// facebook OAuth configuration
+exports.facebook = passport.use(new FacebookStrategy({
+	clientID: config.facebook.clientID,
+	clientSecret: config.facebook.clientSecret,
+	callbackURL: config.facebook.callbackURL 
+	},
+	function (accessToken, refreshToken, profile, done) {
+		User.findOne({ Oauth: profile.id }, function (err, user) { // mongo shell metoda: db.collection.findOne()
+			if (err) {
+				console.log(err0); // handle errors!
+			}
+			if (!err && user !== null) { // pod ovim se podrazumeva da ako korisnik vec postoji u bazi (tj. rezultat potrage po bazi nije null) onda se ne mora nista s tim u vezi dalje raditi pa se ide dole na done() funkciju.
+				done(null, user);
+			} else {
+				user = new User({
+					username: profile.displayName
+				});
+				user.OauthId = profile.id;
+				user.OauthToken = accessToken;
+				user.save(function (err) {
+					if (err) {
+						console.log(err); // handle errors!
+					} else {
+						console.log("saving user...");
+						done(null, user);
+					}
+				});
+			}
+		});
+
+
+
+	}
+))
